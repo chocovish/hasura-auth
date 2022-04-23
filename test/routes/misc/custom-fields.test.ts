@@ -2,11 +2,17 @@ import { Client } from 'pg';
 import * as faker from 'faker';
 import { StatusCodes } from 'http-status-codes';
 
-import { reloadMetadata } from '@/metadata';
+import { HasuraAdminClient } from '@nhost/hasura';
 import { ENV } from '@/utils';
+import { logger } from '@/logger';
 import { request } from '../../server';
 
 describe('metadata fields', () => {
+  const { metadata } = new HasuraAdminClient({
+    endpoint: ENV.HASURA_GRAPHQL_GRAPHQL_URL.replace('/v1/graphql', ''),
+    adminSecret: ENV.HASURA_GRAPHQL_ADMIN_SECRET,
+    logger,
+  });
   const firstName = faker.name.firstName();
   let client: Client;
 
@@ -15,7 +21,7 @@ describe('metadata fields', () => {
       connectionString: ENV.HASURA_GRAPHQL_DATABASE_URL,
     });
     await client.connect();
-    await reloadMetadata();
+    await metadata.reload();
     await request.post('/change-env').send({
       AUTH_DISABLE_NEW_USERS: false,
       AUTH_EMAIL_SIGNIN_EMAIL_VERIFIED_REQUIRED: false,
@@ -23,7 +29,7 @@ describe('metadata fields', () => {
   });
 
   afterAll(async () => {
-    await reloadMetadata();
+    await metadata.reload();
     await client.end();
   });
 

@@ -7,6 +7,7 @@
   "compilerOptions": {
     "lib": ["dom", "es2020"],
     "paths": {
+      "@nhost/*": ["./packages/*"],
       "@config": ["config"],
       "@/*": ["./*"]
     },

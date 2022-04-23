@@ -1,20 +1,20 @@
 import { Client } from 'pg';
 import * as faker from 'faker';
 
-import {
-  createArrayRelationship,
-  createObjectRelationship,
-  dropRelationship,
-  reloadMetadata,
-  trackTable,
-  untrackTable,
-} from '@/metadata';
+import { HasuraAdminClient } from '@nhost/hasura';
+
 import { escapeValueToPg, ENV } from '@/utils';
+import { logger } from '@/logger';
 
 import { request } from '../../server';
 import { decodeAccessToken } from '../../utils';
 
 describe('custom JWT claims', () => {
+  const { metadata } = new HasuraAdminClient({
+    endpoint: ENV.HASURA_GRAPHQL_GRAPHQL_URL.replace('/v1/graphql', ''),
+    adminSecret: ENV.HASURA_GRAPHQL_ADMIN_SECRET,
+    logger,
+  });
   let client: Client;
   const organisationId = faker.datatype.uuid();
   const projects = [...Array(3).keys()].map(faker.datatype.uuid);
@@ -41,13 +41,19 @@ describe('custom JWT claims', () => {
         .map((id) => "('" + id + "')")
         .join(',')};
       `);
-    await trackTable({ table: { schema: 'public', name: 'projects' } });
-    await trackTable({
+    await metadata.trackTable({
+      table: { schema: 'public', name: 'projects' },
+    });
+    await metadata.trackTable({
       table: { schema: 'public', name: 'project_members' },
     });
-    await trackTable({ table: { schema: 'public', name: 'organisations' } });
-    await trackTable({ table: { schema: 'public', name: 'profiles' } });
-    await createObjectRelationship({
+    await metadata.trackTable({
+      table: { schema: 'public', name: 'organisations' },
+    });
+    await metadata.trackTable({
+      table: { schema: 'public', name: 'profiles' },
+    });
+    await metadata.createObjectRelationship({
       source: 'default',
       table: {
         schema: 'auth',
@@ -64,7 +70,7 @@ describe('custom JWT claims', () => {
         },
       },
     });
-    await createObjectRelationship({
+    await metadata.createObjectRelationship({
       source: 'default',
       table: {
         schema: 'public',
@@ -75,7 +81,7 @@ describe('custom JWT claims', () => {
         foreign_key_constraint_on: ['organisation_id'],
       },
     });
-    await createArrayRelationship({
+    await metadata.createArrayRelationship({
       source: 'default',
       table: {
         schema: 'public',
@@ -92,7 +98,7 @@ describe('custom JWT claims', () => {
         },
       },
     });
-    await createObjectRelationship({
+    await metadata.createObjectRelationship({
       source: 'default',
       table: {
         schema: 'public',
@@ -104,7 +110,7 @@ describe('custom JWT claims', () => {
       },
     });
 
-    await reloadMetadata();
+    await metadata.reload();
     await request.post('/change-env').send({
       AUTH_DISABLE_NEW_USERS: false,
       AUTH_EMAIL_SIGNIN_EMAIL_VERIFIED_REQUIRED: false,
@@ -112,31 +118,31 @@ describe('custom JWT claims', () => {
   });
 
   afterAll(async () => {
-    await dropRelationship({
+    await metadata.dropRelationship({
       table: { schema: 'public', name: 'profiles' },
       relationship: 'contributesTo',
     });
-    await dropRelationship({
+    await metadata.dropRelationship({
       table: { schema: 'auth', name: 'users' },
       relationship: 'profile',
     });
-    await dropRelationship({
+    await metadata.dropRelationship({
       table: { schema: 'public', name: 'project_members' },
       relationship: 'project',
     });
-    await untrackTable({
+    await metadata.untrackTable({
       table: { schema: 'public', name: 'project_members' },
       cascade: true,
     });
-    await untrackTable({
+    await metadata.untrackTable({
       table: { schema: 'public', name: 'organisations' },
       cascade: true,
     });
-    await untrackTable({
+    await metadata.untrackTable({
       table: { schema: 'public', name: 'profiles' },
       cascade: true,
     });
-    await untrackTable({
+    await metadata.untrackTable({
       table: { schema: 'public', name: 'projects' },
       cascade: true,
     });
@@ -148,7 +154,7 @@ describe('custom JWT claims', () => {
         `
     );
     await client.end();
-    await reloadMetadata();
+    await metadata.reload();
   });
 
   beforeEach(async () => {
